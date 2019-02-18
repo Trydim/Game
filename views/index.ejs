@@ -1,0 +1,59 @@
+<!DOCTYPE HTML>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title></title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Place favicon.ico in the root directory -->
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+  <body>
+    <div class="game">
+      <div class="status">
+        <p>Speed:<span class="speed">20</span></p>
+        <p>coord:<span class="coord"></span></p>
+        <table>
+          <tbody id="timers">
+          <tr>
+            <td>Round time:</td>
+            <td id="roundTime"></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="battlefield">
+      </div>
+      <div class = "btn-column">
+        <button id="start" type="button" class="btn-start">Ready</button>
+      </div>
+    </div>
+
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">End Game</h4>
+          <button type="button" class="close">×</button>
+        </div>
+        <div class="modal-body">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/main.js"></script>
+  </body>
+</html>

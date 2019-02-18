@@ -1,0 +1,214 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var Player = require('../gameplay');
+var debug = require('debug')('myapp:server');
+var http = require('http');
+
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+var io = require('socket.io')(server);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port, () => {
+  console.log('Work on port:' + port);
+});
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Custom event
+ */
+
+var gamers = {}, countP = 0;
+var roundtime, timeout = 0, gameStarting = false;
+
+io.on('connection', (socket) => {
+  console.log('%s: %s - connected', socket.id, io.eio.clientsCount);
+
+  socket.on('add new user', () => {
+    gamers[socket.id] = new Player();
+    countP = Object.values(gamers).length;
+    gamers[socket.id].setPos({ top: 200, left: 200 + (countP - 1) * 30 });
+    socket.emit('addUser', gamers[socket.id].getCurPos(), socket.id);
+    if(countP <= 1) return;
+    for(let id in gamers){
+        io.sockets.emit('addConnectedUsers', gamers[id].getCurPos(), id);
+    }
+  });
+
+  socket.on('ready', () => {
+    gamers[socket.id].time = 0;
+    gamers[socket.id].setReady();
+  });
+
+  socket.on('move', (data) => {
+    if(gamers[socket.id] === undefined) return;
+    gamers[socket.id].move(data);
+  });
+
+  //Удаляем пользователя.
+  socket.on('disconnect', () => {
+    gameStarting = false;
+    delete gamers[socket.id];
+    countP--;
+    io.sockets.emit('delUser', socket.id);
+  })
+});
+
+function moving() {
+  if(roundtime <= 0 && gameStarting) {
+    gameStarting = false;
+    let winner = gameStop();
+    io.sockets.emit('stopGame', winner);
+  }
+  for(let Id in gamers){
+    gamers[Id].applyStep();
+    if(gamers[Id].host) gamers[Id].setNewTime(1);
+    let data = [gamers[Id].getCurPos(),
+      gamers[Id].time, roundtime];
+
+    io.sockets.emit('newPoint', Id, data);
+  }
+  if(!gameStarting && countP > 1) { // второе условие что бы не вызывать функцию
+      if (checkReady()) {
+        gameStarting = true;
+        gameStart();
+      }
+  }
+  else {
+    if(timeout >= 20) {
+      let newHost = checkColision();
+      if (newHost) {
+        timeout = 0;
+        io.sockets.emit('catch', newHost);
+      }
+    }
+    timeout++;
+    roundtime--;
+  }
+}
+
+setInterval(moving, 20);
+
+function checkColision() {
+  for(let id1 in gamers)
+  {
+    if(gamers[id1].host) {
+      let player1 = gamers[id1].getCurPos();
+      for (let id2 in gamers) {
+        if (id1 === id2) continue;
+        let player2 = gamers[id2].getCurPos();
+        let x = player1.left - player2.left;
+        let y = player1.top - player2.top;
+        if (Math.sqrt(x ** 2 + y ** 2) < 18) {
+          gamers[id1].setHost();
+          gamers[id2].setHost();
+          return id2;
+        }
+      }
+    }
+  }
+}
+
+function checkReady() {
+  for(let Id in gamers)
+    if(!gamers[Id].ready) return false;
+  return true;
+}
+
+function gameStart() {
+  roundtime = 2500; // 20 s просто циклы.
+  let i = 1, randhost = Math.round(Math.random()* countP + 0.5);
+  console.log(randhost, 'play: ' + countP);
+  for(let Id in gamers) {
+    if(i === randhost){
+      gamers[Id].setHost();
+      io.sockets.emit('catch', Id);
+      return;
+    }
+    i++;
+  }
+}
+
+function gameStop() {
+  let winId, min = 10000;
+  for(let Id in gamers) {
+    if(gamers[Id].time < min){ min = gamers[Id].time; winId = Id; }
+    gamers[Id].host = gamers[Id].ready = false;
+  }
+  return winId;
+}
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+/**
+ * Event listener for HTTP server "error" event.
+ */
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
